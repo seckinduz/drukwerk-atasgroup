@@ -54,8 +54,8 @@
   const vid = document.getElementById("truckvid");
   let vidDuur = 0;
   function zet() {
-    const px = p * H * 0.26, s = 1 + p * 0.6, o = 1 - smooth(0.3, 0.95, p);
-    truck.style.transform = `translate3d(${tx}px,${px + H * 0.10}px,0) scale(${s})`;
+    const px = p * H * (mobiel() ? 0.12 : 0.26), s = 1 + p * (mobiel() ? 0.09 : 0.12), o = 1 - smooth(0.08, 0.6, p), basis = mobiel() ? -0.02 : 0.10;
+    truck.style.transform = `translate3d(${tx}px,${px + H * basis}px,0) scale(${s})`;
     truck.style.opacity = o.toFixed(3);
     if (vid && vidDuur && !minder) {
       // bovenaan: loop vrij; bij scrollen: video speelt vooruit mee met de scrollstand
