@@ -16,21 +16,21 @@
 <meta property="og:title" content="A6 kerstkaarten en relatiekaarten bedrukken | ATAS DRUKWERK &amp; CARDS">
 <meta property="og:description" content="Gepersonaliseerde A6 kaarten op 350 g/m² met uw logo. B2B-prijzen van € 0,35 tot € 0,95 per kaart, vooraf een vrijblijvende digitale proefdruk.">
 <meta property="og:url" content="https://drukwerk.atasgroup.nl/">
-<meta property="og:image" content="https://drukwerk.atasgroup.nl/og.png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="ATAS DRUKWERK &amp; CARDS logo op een obsidiaanzwarte achtergrond">
+<meta property="og:image" content="https://drukwerk.atasgroup.nl/hero-truck.png">
+<meta property="og:image:width" content="1672">
+<meta property="og:image:height" content="941">
+<meta property="og:image:alt" content="Zwarte vrachtwagen met ATAS DRUKWERK-logo en gepersonaliseerde A6 kerst- en relatiekaarten op een natte nachtelijke snelweg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="A6 kerst- en relatiekaarten bedrukken | ATAS DRUKWERK &amp; CARDS">
 <meta name="twitter:description" content="Gepersonaliseerde A6 kaarten op 350 g/m². € 0,35 tot € 0,95 per kaart. Vrijblijvende digitale proefdruk.">
-<meta name="twitter:image" content="https://drukwerk.atasgroup.nl/og.png">
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<meta name="twitter:image" content="https://drukwerk.atasgroup.nl/hero-truck.png">
+<link rel="preload" as="image" href="hero-truck.webp" type="image/webp" fetchpriority="high">
 <link rel="stylesheet" href="style.css">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@graph":[
  {"@type":"Product","@id":"https://drukwerk.atasgroup.nl/#product","name":"Gepersonaliseerde A6 kerst- en relatiekaarten (350 g/m²)",
   "description":"Dubbelzijdig bedrukte A6-kaarten op 350 g/m² karton met het logo en de huisstijl van uw bedrijf, inclusief vrijblijvende digitale proefdruk.",
-  "image":"https://drukwerk.atasgroup.nl/og.png","category":"Zakelijk drukwerk",
+  "image":"https://drukwerk.atasgroup.nl/hero-truck.png","category":"Zakelijk drukwerk",
   "brand":{"@type":"Brand","name":"ATAS CARDS"},
   "offers":{"@type":"AggregateOffer","priceCurrency":"EUR","lowPrice":"0.35","highPrice":"0.95","offerCount":"7",
    "availability":"https://schema.org/InStock","url":"https://drukwerk.atasgroup.nl/#prijzen",
@@ -48,7 +48,8 @@
 <body>
 <script>document.documentElement.classList.add('js')</script>
 <div class="glow" aria-hidden="true"><i></i><i></i><i></i></div>
-<canvas id="scene" data-logo="ATAS DRUKWERK" role="img" aria-label="Geanimeerde 3D-scène van een zwarte vrachtwagen op een nachtelijke snelweg"></canvas>
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="truck-stage"><div class="truck" id="truck" data-focus="0.22"><picture><source srcset="hero-truck.webp" type="image/webp"><img src="hero-truck.png" alt="Zwarte vrachtwagen met ATAS DRUKWERK-logo en gepersonaliseerde A6 kerst- en relatiekaarten op een natte nachtelijke snelweg" width="1672" height="941" fetchpriority="high" decoding="async"></picture><i class="cone" style="left:11.7%;top:62.0%"></i><i class="flare" style="left:11.7%;top:62.0%"></i><i class="flare" style="left:30.8%;top:61.0%"></i></div></div>
 <a class="skip" href="#inhoud">Direct naar de inhoud</a>
 <header class="site" id="top"><div class="wrap">
   <a class="logo" href="/" aria-label="ATAS DRUKWERK, naar de homepage"><img src="logo-drukwerk.svg" alt="ATAS DRUKWERK" width="210" height="34"></a>
@@ -58,12 +59,13 @@
 
 <main id="inhoud">
 <section class="hero" aria-labelledby="titel">
-  <div class="wrap">
+  <div class="wrap hero-top">
     <span class="kicker">ATAS DRUKWERK &amp; CARDS · A6 · 350 g/m²</span>
-    <h1 id="titel">In een Digitale Wereld Maakt <em>Echt Drukwerk</em> het Verschil.</h1>
+    <h1 id="titel" class="lang">In een Digitale Wereld Maakt <em>Echt Drukwerk</em> het Verschil.</h1>
+  </div>
+  <div class="wrap hero-bottom">
     <p class="sub">Van Pixel tot Tastbare Klasse — 350 g/m². Gepersonaliseerde A6 kerst- en relatiekaarten met uw logo en huisstijl, vooraf te beoordelen met een vrijblijvende digitale proefdruk.</p>
     <div class="cta"><a class="btn pill" href="#proefdruk">Vrijblijvende digitale proefdruk aanvragen</a><a class="btn ghost" href="#prijzen">Bekijk de prijzen</a></div>
-    <div id="hero-showcase" class="glass reveal" role="img" aria-label="Plaats voor een cinematische film of beeldpresentatie van de A6-kaarten"><span>Cinematic showcase · binnenkort</span></div>
   </div>
 </section>
 
@@ -151,6 +153,6 @@ var body='Bedrijf: '+d.get('bedrijf')+'\nContactpersoon: '+d.get('naam')+'\nE-ma
 location.href='mailto:sales@atasgroup.nl?subject='+encodeURIComponent('Aanvraag digitale proefdruk - '+d.get('bedrijf'))+'&body='+encodeURIComponent(body);});
 })();
 </script>
-<script type="module" src="scene.js"></script>
+<script src="scene.js" defer></script>
 </body>
 </html>
