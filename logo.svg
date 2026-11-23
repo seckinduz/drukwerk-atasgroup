@@ -1,4 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Atas Group logo">
-  <rect width="64" height="64" rx="10" fill="#0e2a47"/>
-  <path d="M32 11 L52 52 H43.5 L39.8 43.5 H24.2 L20.5 52 H12 Z M32 25 L27.4 36.5 H36.6 Z" fill="#b89758" fill-rule="evenodd"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 290 64" role="img" aria-label="Atas Group"><path d="M32 11 L52 52 H43.5 L39.8 43.5 H24.2 L20.5 52 H12 Z M32 25 L27.4 36.5 H36.6 Z" fill="#d4cfc7" fill-rule="evenodd"/><text x="66" y="43" font-family="Segoe UI, Inter, Helvetica, Arial, sans-serif" font-weight="700" font-size="28" letter-spacing="4.5" fill="#f5f6f8">ATAS GROUP</text></svg>

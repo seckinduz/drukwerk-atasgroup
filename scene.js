@@ -1,104 +1,250 @@
-// Ademende 3D deeltjesbol (goud/marineblauw). Reageert op muis en scroll. Geen externe assets.
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+// Nachtelijke snelweg met zwarte vrachtwagen. Laadt automatisch models/truck.glb (indien aanwezig);
+// zonder model toont de scene een rustige natte nachtweg met platina lichtbundels. Geen fouten bij ontbrekend model.
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
 const canvas = document.getElementById("scene");
-if (canvas) init();
+const PLAT = 0xd4cfc7;
+setTimeout(() => { if (canvas) init().catch(() => { canvas.style.display = "none"; }); }, 0);
 
-function init() {
-  const mobiel = window.matchMedia("(max-width: 768px)").matches;
-  const minder = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let renderer;
-  try {
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true, powerPreference: "high-performance" });
-  } catch (e) { canvas.style.display = "none"; return; }
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setClearColor(0x000000, 0);
+function glowTexture() {
+  const c = document.createElement("canvas"); c.width = c.height = 128;
+  const g = c.getContext("2d"), r = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  r.addColorStop(0, "rgba(255,255,255,1)"); r.addColorStop(0.25, "rgba(255,255,255,.45)"); r.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = r; g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+}
 
-  const scene = new THREE.Scene();
-  const cam = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-  cam.position.z = 7.2;
+function streakTexture() {
+  const c = document.createElement("canvas"); c.width = 64; c.height = 256;
+  const g = c.getContext("2d"), l = g.createLinearGradient(0, 0, 0, 256);
+  l.addColorStop(0, "rgba(255,255,255,0)"); l.addColorStop(0.5, "rgba(255,255,255,.8)"); l.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = l; g.fillRect(0, 0, 64, 256);
+  const h = g.createLinearGradient(0, 0, 64, 0);
+  h.addColorStop(0, "rgba(0,0,0,1)"); h.addColorStop(0.5, "rgba(0,0,0,0)"); h.addColorStop(1, "rgba(0,0,0,1)");
+  g.globalCompositeOperation = "destination-out"; g.fillStyle = h; g.fillRect(0, 0, 64, 256);
+  return new THREE.CanvasTexture(c);
+}
 
-  const N = mobiel ? 7000 : 20000;
-  const pos = new Float32Array(N * 3), seed = new Float32Array(N), mix = new Float32Array(N);
-  for (let i = 0; i < N; i++) {
-    // Fibonacci-bol met lichte diepte-spreiding
-    const k = i + 0.5, phi = Math.acos(1 - 2 * k / N), th = Math.PI * (1 + Math.sqrt(5)) * k;
-    const r = 2.1 + (Math.random() - 0.5) * 0.18;
-    pos[i * 3] = r * Math.cos(th) * Math.sin(phi);
-    pos[i * 3 + 1] = r * Math.sin(th) * Math.sin(phi);
-    pos[i * 3 + 2] = r * Math.cos(phi);
-    seed[i] = Math.random() * 6.283; mix[i] = Math.random();
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-  geo.setAttribute("aSeed", new THREE.BufferAttribute(seed, 1));
-  geo.setAttribute("aMix", new THREE.BufferAttribute(mix, 1));
+function asfaltTexture(maxAniso) {
+  const c = document.createElement("canvas"); c.width = 512; c.height = 1024;
+  const g = c.getContext("2d");
+  g.fillStyle = "#101216"; g.fillRect(0, 0, 512, 1024);
+  for (let i = 0; i < 9000; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * 0.05})`; g.fillRect(Math.random() * 512, Math.random() * 1024, 2, 2); }
+  g.fillStyle = "rgba(245,246,248,.85)";
+  g.fillRect(14, 0, 8, 1024); g.fillRect(490, 0, 8, 1024);            // randlijnen
+  for (let y = 0; y < 1024; y += 256) g.fillRect(252, y + 40, 8, 120);   // middenstreep
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = maxAniso; t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 
-  const mat = new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    uniforms: { uT: { value: 0 }, uBreath: { value: 0 }, uPx: { value: renderer.getPixelRatio() * (mobiel ? 1.5 : 2) },
-                uMouse: { value: new THREE.Vector2() } },
-    vertexShader: `
-      uniform float uT, uBreath, uPx; uniform vec2 uMouse;
-      attribute float aSeed, aMix; varying float vMix; varying float vL;
-      void main(){
-        vec3 p = position; vec3 n = normalize(p);
-        float wave = sin(uT*.9 + aSeed + p.y*1.3) * .06 + sin(uT*.5 + p.x*1.7 + aSeed) * .05;
-        float breath = 1.0 + uBreath * .12 + sin(uT*.7) * .05;
-        p = n * (length(p) + wave) * breath;
-        vec3 m = vec3(uMouse * 2.6, 1.2);
-        float d = distance(p, m); p += n * smoothstep(1.9, 0.0, d) * .38;
-        vec4 mv = modelViewMatrix * vec4(p, 1.0);
-        gl_Position = projectionMatrix * mv;
-        gl_PointSize = (1.2 + aMix * 1.6) * uPx * (5.0 / -mv.z);
-        vMix = aMix; vL = .5 + .5 * n.y;
-      }`,
-    fragmentShader: `
-      varying float vMix; varying float vL;
-      void main(){
-        float d = length(gl_PointCoord - .5); if (d > .5) discard;
-        vec3 navy = vec3(.16,.34,.62), gold = vec3(.96,.78,.42), violet = vec3(.38,.34,.86);
-        vec3 c = mix(mix(navy, violet, vMix), gold, smoothstep(.45, 1.0, vL * .7 + vMix * .45));
-        gl_FragColor = vec4(c, smoothstep(.5, .0, d) * .85);
-      }`
+function logoTexture(label) {
+  const c = document.createElement("canvas"); c.width = 2048; c.height = 512;
+  const g = c.getContext("2d");
+  g.clearRect(0, 0, 2048, 512);
+  g.font = "700 250px 'Segoe UI', Inter, Arial, sans-serif";
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillStyle = "#d4cfc7"; g.shadowColor = "rgba(212,207,199,.35)"; g.shadowBlur = 24;
+  if ("letterSpacing" in g) g.letterSpacing = "18px";
+  let size = 250; while (g.measureText(label).width > 1900 && size > 80) { size -= 10; g.font = `700 ${size}px 'Segoe UI', Inter, Arial, sans-serif`; }
+  g.fillText(label, 1024, 262);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  return t;
+}
+
+function beam(len, r, kleur, sterkte) {
+  const geo = new THREE.ConeGeometry(r, len, 28, 1, true);
+  geo.translate(0, -len / 2, 0); geo.rotateX(Math.PI / 2);     // spits bij de oorsprong, wijst naar -z
+  const m = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    uniforms: { uC: { value: new THREE.Color(kleur) }, uS: { value: sterkte } },
+    vertexShader: "varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ vUv=uv; vN=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.); vV=normalize(-mv.xyz); gl_Position=projectionMatrix*mv; }",
+    fragmentShader: "uniform vec3 uC; uniform float uS; varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ float a=pow(vUv.y,1.4)*pow(abs(dot(normalize(vN),normalize(vV))),1.6); gl_FragColor=vec4(uC, a*uS); }"
   });
-  const bol = new THREE.Points(geo, mat);
-  scene.add(bol);
+  return new THREE.Mesh(geo, m);
+}
+
+async function init() {
+  const mobiel = matchMedia("(max-width: 768px)").matches;
+  const minder = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const LABEL = canvas.dataset.logo || "ATAS GROUP";
+  const FLIP = new URLSearchParams(location.search).has("flip") || window.TRUCK_FLIP === true;
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !mobiel, powerPreference: "high-performance" });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.9;
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x08090c);
+  scene.fog = new THREE.Fog(0x08090c, 25, 110);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  const cam = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
+
+  scene.add(new THREE.HemisphereLight(0x9aa3b5, 0x050608, 0.35));
+  const key = new THREE.DirectionalLight(0xf5f6f8, 1.1); key.position.set(-8, 12, 6); scene.add(key);
+  const rim = new THREE.DirectionalLight(PLAT, 0.8); rim.position.set(9, 5, -10); scene.add(rim);
+
+  // natte asfaltweg met eindeloos scrollende textuur
+  const ROAD_LEN = 260, TILE = 12;
+  const asf = asfaltTexture(renderer.capabilities.getMaxAnisotropy()); asf.repeat.set(1, ROAD_LEN / TILE);
+  const weg = new THREE.Mesh(new THREE.PlaneGeometry(14, ROAD_LEN),
+    new THREE.MeshStandardMaterial({ map: asf, roughness: 0.22, metalness: 0.55, envMapIntensity: 0.55 }));
+  weg.rotation.x = -Math.PI / 2; weg.position.z = -ROAD_LEN / 2 + 30; scene.add(weg);
+  const berm = new THREE.Mesh(new THREE.PlaneGeometry(220, ROAD_LEN), new THREE.MeshBasicMaterial({ color: 0x050608 }));
+  berm.rotation.x = -Math.PI / 2; berm.position.set(0, -0.03, -ROAD_LEN / 2 + 30); scene.add(berm);
+
+  // lantaarns + reflecties op nat asfalt
+  const glow = glowTexture(), streak = streakTexture();
+  const lampen = [];
+  for (let i = 0; i < 14; i++) for (const zijde of [-1, 1]) {
+    const grp = new THREE.Group();
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: PLAT, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.9 }));
+    s.scale.set(1.1, 1.1, 1); s.position.set(zijde * 8.2, 7, 0);
+    const refl = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 12), new THREE.MeshBasicMaterial({ map: streak, color: PLAT, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.35 }));
+    refl.rotation.x = -Math.PI / 2; refl.position.set(zijde * 4.6, 0.02, 0);
+    grp.add(s, refl); grp.position.z = 30 - i * 18 - (zijde > 0 ? 9 : 0); scene.add(grp); lampen.push(grp);
+  }
+
+  const wielen = [];
+  let truck = null, front = -6.5, achter = 6.5;
+
+  // model zoeken en laden
+  let heeftModel = false;
+  try { const r = await fetch("models/truck.glb", { method: "HEAD" }); heeftModel = r.ok && !/text\/html/.test(r.headers.get("content-type") || ""); } catch (e) { /* geen model */ }
+
+  if (heeftModel) {
+    try {
+      const loader = new GLTFLoader();
+      const draco = new DRACOLoader(); draco.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.6/");
+      loader.setDRACOLoader(draco);
+      const gltf = await loader.loadAsync("models/truck.glb");
+      truck = bouwTruck(gltf.scene);
+    } catch (e) { truck = null; }
+  }
+  if (!truck) {   // fallback: platina lichtbundels boven de weg
+    for (const x of [-2.6, 2.6]) {
+      const b = beam(60, 7, PLAT, 0.22); b.position.set(x, 12, 14); b.rotation.x = 0.55; scene.add(b);
+    }
+    const spot = new THREE.SpotLight(PLAT, 900, 80, 0.5, 0.8, 1.2); spot.position.set(0, 14, 6); spot.target.position.set(0, 0, -14);
+    scene.add(spot, spot.target);
+  }
+
+  function bouwTruck(model) {
+    const holder = new THREE.Group();
+    let box = new THREE.Box3().setFromObject(model), size = box.getSize(new THREE.Vector3());
+    if (size.x > size.z) model.rotation.y = Math.PI / 2;
+    holder.add(model); holder.updateMatrixWorld(true);
+    box = new THREE.Box3().setFromObject(holder); size = box.getSize(new THREE.Vector3());
+    model.scale.multiplyScalar(13 / Math.max(size.x, size.z)); holder.updateMatrixWorld(true);
+    box = new THREE.Box3().setFromObject(holder);
+    const c = box.getCenter(new THREE.Vector3());
+    model.position.x -= c.x; model.position.z -= c.z; model.position.y -= box.min.y;
+    holder.updateMatrixWorld(true);
+    if (FLIP) holder.rotation.y = Math.PI;
+    holder.updateMatrixWorld(true);
+
+    // materialen: matte obsidiaan-zwarte metallic lak; glas, banden en lampen blijven functioneel
+    const lak = (m) => new THREE.MeshStandardMaterial({ color: 0x0a0b0e, metalness: 0.85, roughness: 0.25, envMapIntensity: 1.0, normalMap: m && m.normalMap || null, aoMap: m && m.aoMap || null });
+    model.traverse((o) => {
+      if (!o.isMesh) return;
+      o.material = (Array.isArray(o.material) ? o.material : [o.material]).map((m) => {
+        const n = ((m && m.name) + " " + o.name).toLowerCase();
+        if (/glass|window|windscreen|ruit|cam\b/.test(n)) return new THREE.MeshStandardMaterial({ color: 0x04060a, metalness: 1, roughness: 0.05, envMapIntensity: 1.2 });
+        if (/tire|tyre|rubber|band\b|lastik/.test(n)) return new THREE.MeshStandardMaterial({ color: 0x0b0b0d, metalness: 0, roughness: 0.9 });
+        if (/light|lamp|led|far\b|stop|signal/.test(n)) return m;
+        return lak(m);
+      });
+      if (o.material.length === 1) o.material = o.material[0];
+    });
+
+    // wielen: bovenste knopen met wiel-achtige naam krijgen een eigen draaipunt
+    const kandidaten = [];
+    model.traverse((o) => { if (/wheel|tire|tyre|teker|lastik|rim|jant/i.test(o.name) && !kandidaten.some((k) => k.getObjectById(o.id))) kandidaten.push(o); });
+    kandidaten.forEach((w) => {
+      const b = new THREE.Box3().setFromObject(w); if (b.isEmpty()) return;
+      const pivot = new THREE.Group(); holder.add(pivot);
+      pivot.position.copy(holder.worldToLocal(b.getCenter(new THREE.Vector3())));
+      pivot.attach(w); wielen.push(pivot);
+    });
+
+    // maten voor logo en lichten
+    holder.updateMatrixWorld(true);
+    const hb = new THREE.Box3().setFromObject(holder), hs = hb.getSize(new THREE.Vector3());
+    const L = hs.z, W = hs.x, H = hs.y;
+    front = hb.min.z; achter = hb.max.z;
+    const logoMat = new THREE.MeshBasicMaterial({ map: logoTexture(LABEL), transparent: true, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2 });
+    const zMid = achter - 0.31 * L;
+    for (const zijde of [1, -1]) {
+      const d = new THREE.Mesh(new THREE.PlaneGeometry(0.46 * L, 0.115 * L), logoMat);
+      d.position.set(zijde * (W / 2 + 0.02), hb.min.y + 0.55 * H, zMid); d.rotation.y = zijde * Math.PI / 2; holder.add(d);
+    }
+
+    // koplampen (SpotLight + zichtbare bundel), oranje positielampen, rode stoplichten
+    for (const x of [-1, 1]) {
+      const sp = new THREE.SpotLight(0xfff4e0, 260, 60, 0.38, 0.6, 1.4);
+      sp.position.set(x * 0.34 * W, hb.min.y + 0.26 * H, front + 0.1);
+      sp.target.position.set(x * 0.34 * W * 0.6, 0, front - 25);
+      holder.add(sp, sp.target);
+      const b = beam(22, 2.6, 0xfff4e0, 0.35); b.position.copy(sp.position); holder.add(b);
+      const g = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: 0xfff4e0, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+      g.scale.set(1.2, 1.2, 1); g.position.copy(sp.position); holder.add(g);
+    }
+    const oranje = new THREE.MeshBasicMaterial({ color: 0xff8a1f });
+    for (const zijde of [-1, 1]) for (let i = 0; i < 5; i++) {
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.22), oranje);
+      lamp.position.set(zijde * (W / 2 + 0.02), hb.min.y + 0.8 * H, achter - 0.06 * L - i * 0.14 * L); holder.add(lamp);
+      const g = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: 0xff8a1f, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.8 }));
+      g.scale.set(0.7, 0.7, 1); g.position.copy(lamp.position); holder.add(g);
+    }
+    const rood = new THREE.MeshBasicMaterial({ color: 0xff1a1a });
+    for (const x of [-1, 1]) {
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.34, 0.08), rood);
+      lamp.position.set(x * 0.38 * W, hb.min.y + 0.3 * H, achter + 0.04); holder.add(lamp);
+      const g = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: 0xff1a1a, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.9 }));
+      g.scale.set(1.4, 1.4, 1); g.position.copy(lamp.position); holder.add(g);
+    }
+    const stop = new THREE.PointLight(0xff1a1a, 14, 9, 1.6); stop.position.set(0, hb.min.y + 0.3 * H, achter + 0.8); holder.add(stop);
+    scene.add(holder);
+    return holder;
+  }
+
+  // camerastanden: truck-scene en fallback, gestuurd door scrollen
+  const standen = truck
+    ? [[-9, 2.4, 12, 0, 1.6, 0], [10, 2.0, -5, 0, 1.8, -2], [0, 9, 15, 0, 0.5, -8]]
+    : [[0, 1.5, 10, 0, 9, -30], [0, 3, 11, 0, 4, -30], [0, 10, 14, 0, 0, -30]];
+  const ease = (x) => x * x * (3 - 2 * x);
+  const doel = new THREE.Vector2(), muis = new THREE.Vector2();
+  if (!mobiel) addEventListener("pointermove", (e) => doel.set((e.clientX / innerWidth - 0.5) * 2, -(e.clientY / innerHeight - 0.5) * 2), { passive: true });
+  let scroll = 0; addEventListener("scroll", () => { scroll = Math.min(scrollY / (innerHeight * 1.2), 1); }, { passive: true });
 
   function formaat() {
     const w = canvas.clientWidth, h = canvas.clientHeight;
-    renderer.setSize(w, h, false);
-    cam.aspect = w / h; cam.position.z = w / h < 0.8 ? 10 : 7.2; cam.updateProjectionMatrix();
+    renderer.setSize(w, h, false); cam.aspect = w / h; cam.fov = w / h < 0.8 ? 58 : 42; cam.updateProjectionMatrix();
   }
   addEventListener("resize", formaat); formaat();
 
-  const doel = new THREE.Vector2(), huidig = new THREE.Vector2();
-  if (!mobiel) addEventListener("pointermove", e => { doel.set((e.clientX / innerWidth - 0.5) * 2, -(e.clientY / innerHeight - 0.5) * 2); }, { passive: true });
-  let scroll = 0;
-  addEventListener("scroll", () => { scroll = Math.min(scrollY / innerHeight, 1.5); }, { passive: true });
-
-  let zichtbaar = true, bezig = false, t0 = performance.now(), tijd = 0;
-  new IntersectionObserver(([e]) => {
-    zichtbaar = e.isIntersecting;
-    if (zichtbaar && !minder && !bezig) { t0 = performance.now(); loop(); }
-  }).observe(canvas);
+  let zichtbaar = true, bezig = false, t0 = performance.now();
+  new IntersectionObserver(([e]) => { zichtbaar = e.isIntersecting; if (zichtbaar && !minder && !bezig) { t0 = performance.now(); loop(); } }).observe(canvas);
 
   function frame(nu) {
-    const dt = Math.min((nu - t0) / 1000, 0.05); t0 = nu; tijd += dt;
-    huidig.lerp(doel, 0.05);
-    mat.uniforms.uT.value = tijd;
-    mat.uniforms.uBreath.value = Math.sin(tijd * 0.8) * 0.5 + scroll * 0.6;
-    mat.uniforms.uMouse.value.copy(huidig);
-    bol.rotation.y = tijd * 0.08 + huidig.x * 0.35 + scroll * 0.9;
-    bol.rotation.x = -huidig.y * 0.25 + scroll * 0.3;
-    const s = 1 + scroll * 0.35; bol.scale.setScalar(s);
-    bol.position.y = scroll * 0.9;
+    const dt = Math.min((nu - t0) / 1000, 0.05); t0 = nu;
+    const v = minder ? 0 : 16;
+    asf.offset.y += (v * dt) / TILE;
+    lampen.forEach((l) => { l.position.z += v * dt; if (l.position.z > 34) l.position.z -= 14 * 18; });
+    wielen.forEach((w) => { w.rotation.x += (v * dt) / 0.42; });
+    if (truck) truck.position.y = Math.sin(nu / 230) * 0.01 * (minder ? 0 : 1);
+    canvas.style.opacity = String(Math.max(0.28, 1 - scroll * 0.72));
+    muis.lerp(doel, 0.05);
+    const p = scroll * 2, i = Math.min(Math.floor(p), 1), f = ease(p - i), a = standen[i], b = standen[i + 1];
+    const m = (k) => a[k] + (b[k] - a[k]) * f;
+    cam.position.set(m(0) + muis.x * 0.8, m(1) + muis.y * 0.3, m(2));
+    cam.lookAt(m(3), m(4), m(5));
     renderer.render(scene, cam);
   }
-  function loop() {
-    if (!zichtbaar || minder) { bezig = false; return; }
-    bezig = true; frame(performance.now()); requestAnimationFrame(loop);
-  }
+  function loop() { if (!zichtbaar || minder) { bezig = false; return; } bezig = true; frame(performance.now()); requestAnimationFrame(loop); }
   frame(performance.now());
   if (!minder) loop();
 }
