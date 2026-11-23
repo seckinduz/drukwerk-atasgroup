@@ -20,7 +20,7 @@
     canvas.style.width = W + "px"; canvas.style.height = H + "px";
     // op mobiel is de foto breder dan het scherm: kabine (focus) in het midden zetten
     const focus = parseFloat(truck.dataset.focus || "0.3");
-    tx = mobiel() ? (0.5 - focus) * truck.offsetWidth : 0;
+    tx = 0; // video past volledig in het scherm: dorse-logo nooit afgesneden
     zet();
   }
 
@@ -51,10 +51,17 @@
     }
   }
 
+  const vid = document.getElementById("truckvid");
+  let vidDuur = 0;
   function zet() {
     const px = p * H * 0.26, s = 1 + p * 0.6, o = 1 - smooth(0.3, 0.95, p);
     truck.style.transform = `translate3d(${tx}px,${px + H * 0.10}px,0) scale(${s})`;
     truck.style.opacity = o.toFixed(3);
+    if (vid && vidDuur && !minder) {
+      // bovenaan: loop vrij; bij scrollen: video speelt vooruit mee met de scrollstand
+      if (p > 0.01) { if (!vid.paused) vid.pause(); const t = Math.min(p, 1) * (vidDuur - 0.05); if (Math.abs(vid.currentTime - t) > 0.04) vid.currentTime = t; }
+      else if (vid.paused) vid.play().catch(() => {});
+    }
     if (heroKop) { const t = 1 - smooth(0.05, 0.5, p); heroKop.style.opacity = t.toFixed(3); heroKop.style.transform = `translate3d(0,${-p * 50}px,0)`; }
     if (heroOnder) { const t = 1 - smooth(0.05, 0.4, p); heroOnder.style.opacity = t.toFixed(3); heroOnder.style.transform = `translate3d(0,${p * 30}px,0)`; }
   }
@@ -77,8 +84,9 @@
   addEventListener("scroll", scroll, { passive: true });
   addEventListener("resize", () => { maat(); start(); });
   document.addEventListener("visibilitychange", scroll);
-  const img = truck.querySelector("img");
-  (img.complete ? Promise.resolve() : new Promise((r) => img.addEventListener("load", r, { once: true }))).then(() => { maat(); document.body.classList.add("cine"); });
+  const media = vid || truck.querySelector("img");
+  const klaarMedia = !media ? Promise.resolve() : vid ? new Promise((r) => { const ok = () => { vidDuur = vid.duration || 0; r(); }; if (vid.readyState >= 1) ok(); else { vid.addEventListener("loadedmetadata", ok, { once: true }); setTimeout(r, 2500); } }) : (media.complete ? Promise.resolve() : new Promise((r) => media.addEventListener("load", r, { once: true })));
+  klaarMedia.then(() => { maat(); document.body.classList.add("cine"); });
 
   // ?p=0..1 : vaste scrollstand voor controle
   const dbg = new URLSearchParams(location.search).get("p");
