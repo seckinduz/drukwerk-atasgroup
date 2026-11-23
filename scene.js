@@ -75,7 +75,7 @@ async function init() {
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: !mobiel, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.9;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x08090c);
   scene.fog = new THREE.Fog(0x08090c, 25, 110);
@@ -103,7 +103,7 @@ async function init() {
     const grp = new THREE.Group();
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: PLAT, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.9 }));
     s.scale.set(1.1, 1.1, 1); s.position.set(zijde * 8.2, 7, 0);
-    const refl = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 12), new THREE.MeshBasicMaterial({ map: streak, color: PLAT, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.35 }));
+    const refl = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 12), new THREE.MeshBasicMaterial({ map: streak, color: PLAT, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.16 }));
     refl.rotation.x = -Math.PI / 2; refl.position.set(zijde * 4.6, 0.02, 0);
     grp.add(s, refl); grp.position.z = 30 - i * 18 - (zijde > 0 ? 9 : 0); scene.add(grp); lampen.push(grp);
   }
@@ -133,9 +133,11 @@ async function init() {
   }
 
   function bouwTruck(model) {
+    // 1) richting en schaal: voorkant = -z, lengte 13 eenheden, wielen op y=0
+    if (FLIP) model.rotation.y += Math.PI;
     const holder = new THREE.Group();
     let box = new THREE.Box3().setFromObject(model), size = box.getSize(new THREE.Vector3());
-    if (size.x > size.z) model.rotation.y = Math.PI / 2;
+    if (size.x > size.z) model.rotation.y += Math.PI / 2;
     holder.add(model); holder.updateMatrixWorld(true);
     box = new THREE.Box3().setFromObject(holder); size = box.getSize(new THREE.Vector3());
     model.scale.multiplyScalar(13 / Math.max(size.x, size.z)); holder.updateMatrixWorld(true);
@@ -143,26 +145,32 @@ async function init() {
     const c = box.getCenter(new THREE.Vector3());
     model.position.x -= c.x; model.position.z -= c.z; model.position.y -= box.min.y;
     holder.updateMatrixWorld(true);
-    if (FLIP) holder.rotation.y = Math.PI;
-    holder.updateMatrixWorld(true);
 
-    // materialen: matte obsidiaan-zwarte metallic lak; glas, banden en lampen blijven functioneel
-    const lak = (m) => new THREE.MeshStandardMaterial({ color: 0x0a0b0e, metalness: 0.85, roughness: 0.25, envMapIntensity: 1.0, normalMap: m && m.normalMap || null, aoMap: m && m.aoMap || null });
+    // 2) hulpvlakken (anchor_*) onzichtbaar maken; benoemde delen opzoeken
+    const benoemd = (re) => { const r = []; model.traverse((o) => { if (o.isMesh && re.test(o.name)) r.push(o); }); return r; };
+    benoemd(/^anchor_/).forEach((a) => { a.userData.anker = true; });
+    const midden = (o) => new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3());
+    const maten = (o) => new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3());
+
+    // 3) materialen: matte obsidiaan-zwarte metallic lak; glas, banden, chroom en lampen blijven functioneel
+    const lak = (m) => new THREE.MeshStandardMaterial({ color: 0x0a0b0e, metalness: 0.85, roughness: 0.25, envMapIntensity: 1.8, normalMap: (m && m.normalMap) || null, aoMap: (m && m.aoMap) || null });
     model.traverse((o) => {
       if (!o.isMesh) return;
-      o.material = (Array.isArray(o.material) ? o.material : [o.material]).map((m) => {
+      if (o.userData.anker) { o.visible = false; return; }
+      const lijst = (Array.isArray(o.material) ? o.material : [o.material]).map((m) => {
         const n = ((m && m.name) + " " + o.name).toLowerCase();
-        if (/glass|window|windscreen|ruit|cam\b/.test(n)) return new THREE.MeshStandardMaterial({ color: 0x04060a, metalness: 1, roughness: 0.05, envMapIntensity: 1.2 });
-        if (/tire|tyre|rubber|band\b|lastik/.test(n)) return new THREE.MeshStandardMaterial({ color: 0x0b0b0d, metalness: 0, roughness: 0.9 });
-        if (/light|lamp|led|far\b|stop|signal/.test(n)) return m;
+        if (/glass|window|windscreen|ruit|\bcam\b/.test(n)) return new THREE.MeshStandardMaterial({ color: 0x04060a, metalness: 1, roughness: 0.05, envMapIntensity: 1.2 });
+        if (/tire|tyre|rubber|lastik/.test(n)) return new THREE.MeshStandardMaterial({ color: 0x0b0b0d, metalness: 0, roughness: 0.9 });
+        if (/chrome|silver|alu/.test(n)) return m;
+        if (/light|lamp|\bled\b|\bfar\b|signal/.test(n)) return m;
         return lak(m);
       });
-      if (o.material.length === 1) o.material = o.material[0];
+      o.material = lijst.length === 1 ? lijst[0] : lijst;
     });
 
-    // wielen: bovenste knopen met wiel-achtige naam krijgen een eigen draaipunt
+    // 4) wielen: bovenste knopen met wiel-naam krijgen een eigen draaipunt in het wielmidden
     const kandidaten = [];
-    model.traverse((o) => { if (/wheel|tire|tyre|teker|lastik|rim|jant/i.test(o.name) && !kandidaten.some((k) => k.getObjectById(o.id))) kandidaten.push(o); });
+    model.traverse((o) => { if (/wheel|teker|lastik/i.test(o.name) && !kandidaten.some((k) => k.getObjectById(o.id))) kandidaten.push(o); });
     kandidaten.forEach((w) => {
       const b = new THREE.Box3().setFromObject(w); if (b.isEmpty()) return;
       const pivot = new THREE.Group(); holder.add(pivot);
@@ -170,55 +178,81 @@ async function init() {
       pivot.attach(w); wielen.push(pivot);
     });
 
-    // maten voor logo en lichten
     holder.updateMatrixWorld(true);
     const hb = new THREE.Box3().setFromObject(holder), hs = hb.getSize(new THREE.Vector3());
-    const L = hs.z, W = hs.x, H = hs.y;
     front = hb.min.z; achter = hb.max.z;
+    const W = hs.x, H = hs.y, L = hs.z;
+    const glowMat = (kleur, op = 0.9) => new THREE.SpriteMaterial({ map: glow, color: kleur, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: op });
+
+    // 5) logo op de dorsezijkanten: exact op de anker-vlakken uit het model, anders geschat
     const logoMat = new THREE.MeshBasicMaterial({ map: logoTexture(LABEL), transparent: true, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2 });
-    const zMid = achter - 0.31 * L;
-    for (const zijde of [1, -1]) {
-      const d = new THREE.Mesh(new THREE.PlaneGeometry(0.46 * L, 0.115 * L), logoMat);
-      d.position.set(zijde * (W / 2 + 0.02), hb.min.y + 0.55 * H, zMid); d.rotation.y = zijde * Math.PI / 2; holder.add(d);
+    const ankers = benoemd(/^anchor_decal_/);
+    if (ankers.length) {
+      model.traverse((o) => { if (o.userData.anker && /^anchor_decal_/.test(o.name)) {
+        const cc = midden(o), s = maten(o), zijde = Math.sign(cc.x) || 1;
+        const d = new THREE.Mesh(new THREE.PlaneGeometry(s.z, s.y), logoMat);
+        d.position.set(cc.x + zijde * (s.x / 2 + 0.003), cc.y, cc.z); d.rotation.y = zijde * Math.PI / 2; holder.add(d);
+      } });
+    } else {
+      for (const zijde of [1, -1]) {
+        const d = new THREE.Mesh(new THREE.PlaneGeometry(0.46 * L, 0.115 * L), logoMat);
+        d.position.set(zijde * (W / 2 + 0.02), hb.min.y + 0.55 * H, achter - 0.31 * L); d.rotation.y = zijde * Math.PI / 2; holder.add(d);
+      }
     }
 
-    // koplampen (SpotLight + zichtbare bundel), oranje positielampen, rode stoplichten
-    for (const x of [-1, 1]) {
-      const sp = new THREE.SpotLight(0xfff4e0, 260, 60, 0.38, 0.6, 1.4);
-      sp.position.set(x * 0.34 * W, hb.min.y + 0.26 * H, front + 0.1);
-      sp.target.position.set(x * 0.34 * W * 0.6, 0, front - 25);
-      holder.add(sp, sp.target);
-      const b = beam(22, 2.6, 0xfff4e0, 0.35); b.position.copy(sp.position); holder.add(b);
-      const g = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: 0xfff4e0, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
-      g.scale.set(1.2, 1.2, 1); g.position.copy(sp.position); holder.add(g);
+    // 6) lichten op de echte lampen uit het model; zonder die lampen: schatting op basis van de afmetingen
+    const koplampen = benoemd(/^headlight_/), staart = benoemd(/^taillight_/), marker = benoemd(/^marker_/);
+    if (koplampen.length) {
+      koplampen.forEach((lens) => {
+        const p = holder.worldToLocal(midden(lens)); p.z = front;
+        const sp = new THREE.SpotLight(0xfff4e0, 260, 60, 0.38, 0.6, 1.4);
+        sp.position.copy(p); sp.target.position.set(p.x * 0.6, 0, front - 25); holder.add(sp, sp.target);
+        const b = beam(22, 2.6, 0xfff4e0, 0.35); b.position.copy(p); holder.add(b);
+        const g = new THREE.Sprite(glowMat(0xfff4e0)); g.scale.set(1.2, 1.2, 1); g.position.copy(p); holder.add(g);
+      });
+    } else {
+      for (const x of [-1, 1]) {
+        const p = new THREE.Vector3(x * 0.34 * W, hb.min.y + 0.26 * H, front + 0.1);
+        const sp = new THREE.SpotLight(0xfff4e0, 260, 60, 0.38, 0.6, 1.4);
+        sp.position.copy(p); sp.target.position.set(p.x * 0.6, 0, front - 25); holder.add(sp, sp.target);
+        const b = beam(22, 2.6, 0xfff4e0, 0.35); b.position.copy(p); holder.add(b);
+      }
     }
-    const oranje = new THREE.MeshBasicMaterial({ color: 0xff8a1f });
-    for (const zijde of [-1, 1]) for (let i = 0; i < 5; i++) {
-      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.22), oranje);
-      lamp.position.set(zijde * (W / 2 + 0.02), hb.min.y + 0.8 * H, achter - 0.06 * L - i * 0.14 * L); holder.add(lamp);
-      const g = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: 0xff8a1f, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.8 }));
-      g.scale.set(0.7, 0.7, 1); g.position.copy(lamp.position); holder.add(g);
+    marker.forEach((m) => { const g = new THREE.Sprite(glowMat(0xff8a1f, 0.8)); g.scale.set(0.55, 0.55, 1); g.position.copy(holder.worldToLocal(midden(m))); holder.add(g); });
+    if (staart.length) {
+      staart.forEach((t) => { const g = new THREE.Sprite(glowMat(0xff1a1a)); g.scale.set(1.3, 1.3, 1); g.position.copy(holder.worldToLocal(midden(t))); g.position.z = achter + 0.05; holder.add(g); });
+      const stop = new THREE.PointLight(0xff1a1a, 6, 8, 1.8); stop.position.set(0, hb.min.y + 0.3 * H, achter + 0.8); holder.add(stop);
+    } else {
+      const rood = new THREE.MeshBasicMaterial({ color: 0xff1a1a });
+      for (const x of [-1, 1]) {
+        const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.34, 0.08), rood);
+        lamp.position.set(x * 0.38 * W, hb.min.y + 0.3 * H, achter + 0.04); holder.add(lamp);
+        const g = new THREE.Sprite(glowMat(0xff1a1a)); g.scale.set(1.4, 1.4, 1); g.position.copy(lamp.position); holder.add(g);
+      }
+      const stop = new THREE.PointLight(0xff1a1a, 6, 8, 1.8); stop.position.set(0, hb.min.y + 0.3 * H, achter + 0.8); holder.add(stop);
     }
-    const rood = new THREE.MeshBasicMaterial({ color: 0xff1a1a });
-    for (const x of [-1, 1]) {
-      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.34, 0.08), rood);
-      lamp.position.set(x * 0.38 * W, hb.min.y + 0.3 * H, achter + 0.04); holder.add(lamp);
-      const g = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: 0xff1a1a, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.9 }));
-      g.scale.set(1.4, 1.4, 1); g.position.copy(lamp.position); holder.add(g);
+    if (!marker.length) {
+      const oranje = new THREE.MeshBasicMaterial({ color: 0xff8a1f });
+      for (const zijde of [-1, 1]) for (let i = 0; i < 5; i++) {
+        const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.22), oranje);
+        lamp.position.set(zijde * (W / 2 + 0.02), hb.min.y + 0.8 * H, achter - 0.06 * L - i * 0.14 * L); holder.add(lamp);
+        const g = new THREE.Sprite(glowMat(0xff8a1f, 0.8)); g.scale.set(0.7, 0.7, 1); g.position.copy(lamp.position); holder.add(g);
+      }
     }
-    const stop = new THREE.PointLight(0xff1a1a, 14, 9, 1.6); stop.position.set(0, hb.min.y + 0.3 * H, achter + 0.8); holder.add(stop);
     scene.add(holder);
     return holder;
   }
 
   // camerastanden: truck-scene en fallback, gestuurd door scrollen
   const standen = truck
-    ? [[-9, 2.4, 12, 0, 1.6, 0], [10, 2.0, -5, 0, 1.8, -2], [0, 9, 15, 0, 0.5, -8]]
+    ? [[-9, 2.4, 12, 0, 1.6, 0], [11, 2.4, -13, 0, 1.9, -3], [0, 9, 15, 0, 0.5, -8]]
     : [[0, 1.5, 10, 0, 9, -30], [0, 3, 11, 0, 4, -30], [0, 10, 14, 0, 0, -30]];
   const ease = (x) => x * x * (3 - 2 * x);
   const doel = new THREE.Vector2(), muis = new THREE.Vector2();
   if (!mobiel) addEventListener("pointermove", (e) => doel.set((e.clientX / innerWidth - 0.5) * 2, -(e.clientY / innerHeight - 0.5) * 2), { passive: true });
-  let scroll = 0; addEventListener("scroll", () => { scroll = Math.min(scrollY / (innerHeight * 1.2), 1); }, { passive: true });
+  const dbg = new URLSearchParams(location.search).get("p");
+  let scroll = dbg !== null ? Math.min(Math.max(+dbg, 0), 1) : 0;
+  if (dbg === null) addEventListener("scroll", () => { scroll = Math.min(scrollY / (innerHeight * 1.2), 1); }, { passive: true });
 
   function formaat() {
     const w = canvas.clientWidth, h = canvas.clientHeight;
