@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Zakelijk Drukwerk &amp; A6 Kerst- en Relatiekaarten | ATAS DRUKWERK &amp; CARDS</title>
+<meta name="description" content="Gepersonaliseerde A6 kerst- en relatiekaarten (350 g/m²) met uw logo en huisstijl. Transparante B2B-prijzen van € 0,35 tot € 0,95 per kaart en een vrijblijvende digitale proefdruk.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><div class="wrap">
+  <div class="logo">Atas <b>Drukwerk</b> &amp; Cards</div>
+  <nav><a href="#kaarten">Kaarten</a><a href="#prijzen">Prijzen</a><a href="#proefdruk">Proefdruk</a></nav>
+</div></header>
+
+<main>
+<section class="hero"><div class="wrap">
+  <h1>Zakelijk drukwerk &amp; gepersonaliseerde <span>A6 kerst- en relatiekaarten</span></h1>
+  <p>Bedank uw medewerkers en relaties aan het einde van het jaar met een kaart in uw eigen huisstijl. Afgedrukt op 350 g/m² karton, vooraf te beoordelen met een vrijblijvende digitale proefdruk.</p>
+  <a class="btn solid" href="#proefdruk">Vrijblijvende digitale proefdruk aanvragen</a>
+</div></section>
+
+<section id="kaarten" class="light"><div class="wrap">
+  <h2>Specificaties</h2>
+  <p class="lead">Een kaart die past bij een zorgvuldig merk.</p>
+  <div class="grid">
+    <div class="box"><h3>Formaat A6</h3><p>105 × 148 mm, handzaam en geschikt voor een persoonlijke boodschap.</p></div>
+    <div class="box"><h3>350 g/m² karton</h3><p>Stevig, hoogwaardig papier met een luxe aanvoelende afwerking.</p></div>
+    <div class="box"><h3>Dubbelzijdig bedrukt</h3><p>Voorzijde met uw ontwerp, achterzijde met tekst, logo of uw eigen boodschap.</p></div>
+    <div class="box"><h3>Uw logo en huisstijl</h3><p>Wij verwerken logo, kleuren en een persoonlijke tekst in het ontwerp.</p></div>
+  </div>
+</div></section>
+
+<section id="prijzen"><div class="wrap">
+  <h2>Transparante B2B-prijzen</h2>
+  <p class="lead">Hoe groter de oplage, hoe lager de prijs per kaart. Alle prijzen zijn exclusief btw.</p>
+  <table>
+    <thead><tr><th>Oplage</th><th>Prijs per kaart</th></tr></thead>
+    <tbody>
+      <tr><td>Tot 249 kaarten</td><td class="p">€ 0,95</td></tr>
+      <tr><td>Vanaf 250 kaarten</td><td class="p">€ 0,85</td></tr>
+      <tr><td>Vanaf 500 kaarten</td><td class="p">€ 0,75</td></tr>
+      <tr><td>Vanaf 1.000 kaarten</td><td class="p">€ 0,65</td></tr>
+      <tr><td>Vanaf 2.500 kaarten</td><td class="p">€ 0,55</td></tr>
+      <tr><td>Vanaf 5.000 kaarten</td><td class="p">€ 0,45</td></tr>
+      <tr><td>Vanaf 10.000 kaarten</td><td class="p">€ 0,35</td></tr>
+    </tbody>
+  </table>
+  <p class="note">Een persoonlijke offerte ontvangt u na het aanvragen van een proefdruk. Bestel tijdig voor de jaarwisseling.</p>
+</div></section>
+
+<section id="proefdruk" class="light"><div class="wrap">
+  <h2>Vrijblijvende digitale proefdruk aanvragen</h2>
+  <p class="lead">Vul uw gegevens in. Uw e-mailprogramma opent een kant-en-klaar bericht aan sales@atasgroup.nl. U verstuurt het zelf, er wordt geen data opgeslagen op deze website.</p>
+  <form id="f">
+    <label>Bedrijfsnaam<input name="bedrijf" required></label>
+    <label>Contactpersoon<input name="naam" required></label>
+    <label>E-mailadres<input type="email" name="email" required></label>
+    <label>Gewenste oplage (ongeveer)<input type="number" name="aantal" min="50" step="50" placeholder="bijvoorbeeld 500"></label>
+    <label>Opmerking of wens<textarea name="opmerking"></textarea></label>
+    <label class="check"><input type="checkbox" required> Ik ga akkoord dat Atas Group B.V. mijn gegevens gebruikt om mijn aanvraag te beantwoorden.</label>
+    <button class="btn solid" type="submit">E-mail opstellen</button>
+  </form>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  ATAS DRUKWERK &amp; CARDS · Onderdeel van <a href="https://atasgroup.nl">Atas Group B.V.</a> · Emmen, Nederland · <a href="mailto:sales@atasgroup.nl">sales@atasgroup.nl</a>
+</div></footer>
+
+<script>
+document.getElementById('f').addEventListener('submit',function(e){
+  e.preventDefault();
+  var d=new FormData(e.target);
+  var body='Bedrijf: '+d.get('bedrijf')+'\nContactpersoon: '+d.get('naam')+'\nE-mail: '+d.get('email')+
+           '\nOplage: '+(d.get('aantal')||'nog niet bekend')+'\n\n'+(d.get('opmerking')||'');
+  location.href='mailto:sales@atasgroup.nl?subject='+encodeURIComponent('Aanvraag digitale proefdruk - '+d.get('bedrijf'))+'&body='+encodeURIComponent(body);
+});
+</script>
+</body>
+</html>
