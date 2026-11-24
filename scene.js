@@ -1,95 +1,49 @@
-// Scroll-gestuurde cinema: de vrachtwagenfoto rijdt bij het scrollen naar beneden en vooruit en verdwijnt in het donker.
-// Canvas 2D met wegdeeltjes en lichtstrepen. Zonder externe bibliotheken, 60 fps via requestAnimationFrame.
+// Hero-scene: 3D envelop met gouden A6 kaart. Muis = 3D-kanteling en glans, plus zwevende gouddeeltjes (canvas 2D).
 (function () {
-  const truck = document.getElementById("truck");
-  const canvas = document.getElementById("scene");
-  if (!truck || !canvas) return;
-  const ctx = canvas.getContext("2d");
-  const heroKop = document.querySelector(".hero-top"), heroOnder = document.querySelector(".hero-bottom");
-  const minder = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const mobiel = () => matchMedia("(max-width: 768px)").matches;
-  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
-  const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
-
-  let W = 0, H = 0, dpr = 1, tx = 0, p = 0, doel = 0, vorig = 0, snelheid = 0, bezig = false, zichtbaar = true;
+  'use strict';
+  var hero = document.getElementById('banner'), box = document.getElementById('env'), env = document.getElementById('env3d'), card = document.getElementById('goldcard'), cv = document.getElementById('dust');
+  if (!hero || !env || !cv) return;
+  var minder = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var ctx = cv.getContext('2d'), W = 0, H = 0, dpr = 1, deeltjes = [], zichtbaar = true, actief = false;
+  var tx = 0, ty = 0, cx = 0, cy = 0, mx = .5, my = .4, ptr = false, t0 = performance.now();
 
   function maat() {
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    W = innerWidth; H = innerHeight;
-    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
-    canvas.style.width = W + "px"; canvas.style.height = H + "px";
-    // op mobiel is de foto breder dan het scherm: kabine (focus) in het midden zetten
-    const focus = parseFloat(truck.dataset.focus || "0.3");
-    tx = 0; // video past volledig in het scherm: dorse-logo nooit afgesneden
-    zet();
+    dpr = Math.min(window.devicePixelRatio || 1, 2); W = box.clientWidth || 1; H = box.clientHeight || 1;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var n = Math.round(Math.min(70, Math.max(22, W * H / 22000)));
+    deeltjes = []; for (var i = 0; i < n; i++) deeltjes.push(nieuw(true));
   }
+  function nieuw(init) {
+    var d = Math.random();
+    return { x: W * (.18 + Math.random() * .64), y: init ? H * (.15 + Math.random() * .7) : H * (.72 + Math.random() * .1), r: 1 + d * 2.6, v: .12 + d * .42, w: Math.random() * 6.28, s: .4 + Math.random() * 1.2, a: .5 + d * .5 };
+  }
+  function teken(t) {
+    ctx.clearRect(0, 0, W, H); ctx.globalCompositeOperation = 'source-over';
+    deeltjes.forEach(function (d) {
+      if (!minder) { d.y -= d.v; d.x += Math.sin(t / 1400 * d.s + d.w) * .35; }
+      if (d.y < H * .06) { Object.assign(d, nieuw(false)); }
+      var tw = .55 + .45 * Math.sin(t / 500 * d.s + d.w), g = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, d.r * 5);
+      g.addColorStop(0, 'rgba(243,111,33,' + (d.a * tw).toFixed(3) + ')'); g.addColorStop(.35, 'rgba(212,165,58,' + (d.a * tw * .45).toFixed(3) + ')'); g.addColorStop(1, 'rgba(230,203,131,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(d.x, d.y, d.r * 5, 0, 6.2832); ctx.fill();
+    });
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  function lus(now) {
+    actief = false; if (!zichtbaar || document.hidden) return;
+    var t = now - t0;
+    if (!ptr && !minder) { mx = .5 + Math.sin(t / 2600) * .22; my = .4 + Math.cos(t / 3100) * .15; }
+    tx = (.5 - my) * 14; ty = (mx - .5) * 22;
+    cx += (tx - cx) * .07; cy += (ty - cy) * .07;
+    env.style.setProperty('--rx', cx.toFixed(2) + 'deg'); env.style.setProperty('--ry', cy.toFixed(2) + 'deg');
+    card.style.setProperty('--mx', (mx * 100).toFixed(1) + '%'); card.style.setProperty('--my', (my * 100).toFixed(1) + '%');
+    teken(now); start();
+  }
+  function start() { if (!actief) { actief = true; requestAnimationFrame(lus); } }
 
-  // wegdeeltjes die vanuit het verdwijnpunt naar buiten stromen
-  const N = mobiel() ? 46 : 90;
-  const deeltjes = Array.from({ length: N }, () => nieuw(true));
-  function nieuw(start) {
-    const hoek = (0.08 + Math.random() * 0.84) * Math.PI;           // vooral het onderste halfrond (weg)
-    return { a: hoek, r: start ? Math.random() * 600 : 4 + Math.random() * 20, v: 0.4 + Math.random() * 0.9, l: 0.5 + Math.random() };
-  }
-  function teken() {
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, W, H);
-    const alfa = (1 - smooth(0.5, 1.0, p)) * 0.9 + 0.1 * smooth(0.0, 0.4, p);
-    if (alfa <= 0.02) return;
-    const vx = W * 0.55, vy = H * 0.6, max = Math.hypot(W, H);
-    ctx.lineCap = "round";
-    for (const d of deeltjes) {
-      const versnel = 0.25 + snelheid * 14 + p * 1.6;
-      const r0 = d.r; d.r += (0.35 + d.r * 0.012) * d.v * versnel * (minder ? 0 : 1);
-      if (d.r > max) Object.assign(d, nieuw(false));
-      const k = Math.min(d.r / 500, 1);
-      const x0 = vx + Math.cos(d.a) * r0 * 1.7, y0 = vy + Math.sin(d.a) * r0 * 0.75;
-      const x1 = vx + Math.cos(d.a) * d.r * 1.7, y1 = vy + Math.sin(d.a) * d.r * 0.75;
-      ctx.strokeStyle = `rgba(212,207,199,${(0.05 + 0.5 * k) * alfa * d.l})`;
-      ctx.lineWidth = 0.6 + 1.8 * k;
-      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
-    }
-  }
-
-  const vid = document.getElementById("truckvid");
-  let vidDuur = 0;
-  function zet() {
-    const px = p * H * (mobiel() ? 0.12 : 0.26), s = 1 + p * (mobiel() ? 0.09 : 0.12), o = 1 - smooth(0.08, 0.6, p), basis = mobiel() ? -0.02 : 0.10;
-    truck.style.transform = `translate3d(${tx}px,${px + H * basis}px,0) scale(${s})`;
-    truck.style.opacity = o.toFixed(3);
-    if (vid && vidDuur && !minder) {
-      // bovenaan: loop vrij; bij scrollen: video speelt vooruit mee met de scrollstand
-      if (p > 0.01) { if (!vid.paused) vid.pause(); const t = Math.min(p, 1) * (vidDuur - 0.05); if (Math.abs(vid.currentTime - t) > 0.04) vid.currentTime = t; }
-      else if (vid.paused) vid.play().catch(() => {});
-    }
-    if (heroKop) { const t = 1 - smooth(0.05, 0.5, p); heroKop.style.opacity = t.toFixed(3); heroKop.style.transform = `translate3d(0,${-p * 50}px,0)`; }
-    if (heroOnder) { const t = 1 - smooth(0.05, 0.4, p); heroOnder.style.opacity = t.toFixed(3); heroOnder.style.transform = `translate3d(0,${p * 30}px,0)`; }
-  }
-
-  function frame() {
-    p += (doel - p) * (minder ? 1 : 0.12);
-    snelheid += (Math.abs(doel - vorig) - snelheid) * 0.2; vorig = doel;
-    zet(); teken();
-    const klaar = Math.abs(doel - p) < 0.0005 && snelheid < 0.0005;
-    if (!zichtbaar || (minder && klaar)) { bezig = false; return; }
-    requestAnimationFrame(frame);
-  }
-  function start() { if (!bezig) { bezig = true; requestAnimationFrame(frame); } }
-
-  function scroll() {
-    doel = clamp(scrollY / (innerHeight * 0.95), 0, 1.2);
-    zichtbaar = scrollY < innerHeight * 1.6 && !document.hidden;
-    if (zichtbaar) start();
-  }
-  addEventListener("scroll", scroll, { passive: true });
-  addEventListener("resize", () => { maat(); start(); });
-  document.addEventListener("visibilitychange", scroll);
-  const media = vid || truck.querySelector("img");
-  const klaarMedia = !media ? Promise.resolve() : vid ? new Promise((r) => { const ok = () => { vidDuur = vid.duration || 0; r(); }; if (vid.readyState >= 1) ok(); else { vid.addEventListener("loadedmetadata", ok, { once: true }); setTimeout(r, 2500); } }) : (media.complete ? Promise.resolve() : new Promise((r) => media.addEventListener("load", r, { once: true })));
-  klaarMedia.then(() => { maat(); document.body.classList.add("cine"); });
-
-  // ?p=0..1 : vaste scrollstand voor controle
-  const dbg = new URLSearchParams(location.search).get("p");
-  if (dbg !== null) { doel = p = clamp(+dbg, 0, 1.2); removeEventListener("scroll", scroll); }
+  hero.addEventListener('pointermove', function (e) { var r = hero.getBoundingClientRect(); ptr = true; mx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)); my = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)); });
+  hero.addEventListener('pointerleave', function () { ptr = false; });
+  if ('IntersectionObserver' in window) new IntersectionObserver(function (es) { zichtbaar = es[0].isIntersecting; if (zichtbaar) start(); }).observe(hero);
+  document.addEventListener('visibilitychange', start);
+  addEventListener('resize', maat);
   maat(); start();
 })();
