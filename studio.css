@@ -508,3 +508,22 @@ footer.site .flogo{background:#fff;padding:8px 14px;border-radius:12px}
 
 .circ{width:116px}.cat-strip{gap:12px}
 @media(max-width:768px){.circ{width:108px}}
+
+/* ===== mobiel: vingervriendelijke aanraakdoelen (min. 44px) ===== */
+@media(max-width:900px),(pointer:coarse){
+  .logo{display:inline-flex;align-items:center;min-height:44px}
+  .hsearch button{width:44px;height:44px}
+  .hbtn,.btn,.mini,.qb,.presets button,.tabs button,.seg button,.accd summary,.cat-vitrine .cat-tile,.sugg button,.circ{min-height:44px}
+  .presets button{padding:0 14px}
+  .bn-arrow{width:44px;height:44px}
+  .bn-dots{gap:0}
+  .bn-dots button{position:relative;width:30px;height:44px;border:0;background:none;padding:0;border-radius:0}
+  .bn-dots button::before{content:"";position:absolute;left:50%;top:50%;width:10px;height:10px;transform:translate(-50%,-50%);border-radius:50%;border:2px solid #111827;background:transparent;transition:.25s}
+  .bn-dots button[aria-current="true"]{width:44px;background:none;border-radius:0}
+  .bn-dots button[aria-current="true"]::before{width:28px;border-radius:99px;background:#F36F21;border-color:#F36F21}
+  .check{min-height:44px;align-items:center}
+  input[type=file]{min-height:48px;padding:8px 12px}
+  .qty input{min-height:48px}
+  .tools .tabs{gap:6px}
+}
+@media(max-width:900px),(pointer:coarse){.bn-dots button{width:44px}.presets button{min-width:44px}}
